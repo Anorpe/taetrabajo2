@@ -1,0 +1,1741 @@
+---
+title: "Trabajo 2 - Técnicas de Aprendizaje Estadístico"
+author: "Integrantes: Andrés Orrego Pérez"
+output: rmdformats::material
+---
+
+```{css, include = FALSE}
+h1 {color: blue;font-style: italic}
+h2 {color: blue}
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(ISLR)
+library(dplyr)
+library(e1071)
+```
+
+
+# Apartado 4.7
+
+## Ejercicio 10
+
+### Weekly Dataset
+
+Es un dataset el cual tiene información sobre la rentabilidad porcentual semanal del índice bursátil S&P 500 entre 1990 y 2010.Este dataset tiene las siguientes 9 variables:
+
+-Year: El año en que se registró la observación
+
+-Lag1: Retorno porcentual de la semana anterior
+
+-Lag2: Retorno porcentual de las 2 semanas anteriores
+
+-Lag3: Retorno porcentual de las 3 semanas anteriores
+
+-Lag4: Retorno porcentual de las 4 semanas anteriores
+
+-Lag5: Retorno porcentual de las 5 semanas anteriores
+
+-Volume: Volumen de acciones negociadas (número medio de acciones negociadas diariamente en miles de millones)
+
+-Today: Retorno porcentual de esta semana
+
+-Direction: Un factor con niveles Downy Upque indica si el mercado tuvo un rendimiento positivo o negativo en una semana determinada
+
+
+
+```{r}
+summary(Weekly)
+```
+
+#### Grafica de las variables agrupadas por pares.
+
+Como podemos ver a primera vista, el unico patron de variables que se puede visualizar es entre Volumen y Año, las demas no son patrones visualmente reconocibles.
+
+```{r}
+pairs(Weekly)
+```
+
+#### Correlacion de las variables
+
+Como podemos ver con los coeficientes de correlación, las variables "Volumen" y "Year" estan muy correlacionadas.
+
+```{r}
+cor(select(Weekly,Year,Lag1,Lag2,Lag3,Lag4,Lag5,Volume,Today))
+```
+
+
+
+#### Entrenamiento de una regresión logistica 
+
+En la siguiente tabla podemos ver que los atributos con menor valor-P se consideran los mas relevantes para la predicción, en nuestro caso el mas relevante es "Lag2".
+
+
+```{r}
+logistica.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Weekly, family= "binomial")
+summary(logistica.fit)
+```
+
+
+
+
+#### Matriz de Confusión
+
+Este modelo presenta una exactitud de 46%. Una precisión del 68%. y una especificidad del 96%. Por lo que vemos que este modelo es muy bueno clasificando los valores negativos que en nuestro caso son los "Down" pero tiene un rendimiento muy bajo clasificando los positivos "Up". En terminos generales el clasificador tiene un rendimiento muy bajo, 46%, seria aproximadamente igual de bueno que lanzar una moneda para predecir la clase.
+
+
+```{r}
+logistica.prob = predict(logistica.fit,type = "response")
+logistica.class <- rep("Down",length(logistica.prob))
+logistica.class[logistica.prob > 0.5] = "Up"
+
+y_real = Weekly$Direction
+table(logistica.class, y_real)
+```
+
+
+
+
+##### Regresión logistica con Lag2 como atributos y partición de datos de entrenamiento y validación
+
+Para el conjunto de validación se obtiene una exactitud 44%
+
+```{r}
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+logistica.fit <- glm(Direction ~ Lag2,data = train, family= "binomial")
+
+logistica.prob = predict(logistica.fit, select(val,Lag2))
+
+logistica.class <- rep("Down",length(logistica.prob))
+logistica.class[logistica.prob > 0.5] = "Up"
+
+y_real = val$Direction
+confusion_matrix <- table(logistica.class, y_real)
+confusion_matrix
+```
+
+
+
+
+
+
+
+#### LDA
+
+Con un modelo de análisis de discriminante lineal obtenemos una exactitud del 62%
+
+```{r}
+
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+lda.fit <- MASS::lda(Direction ~ Lag2,data = train, family= "binomial")
+
+lda.pred = predict(lda.fit, select(val,Lag2))
+
+y_real = val$Direction
+confusion_matrix <- table(lda.pred$class, y_real)
+confusion_matrix
+```
+
+
+#### QDA
+
+Con un modelo de análisis de discriminante cuadrático obtenemos una exactitud del 58%
+
+```{r}
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+qda.fit <- MASS::qda(Direction ~ Lag2,data = train, family= "binomial")
+
+qda.pred = predict(qda.fit, select(val,Lag2))
+
+
+
+y_real = val$Direction
+confusion_matrix <- table(qda.pred$class, y_real)
+confusion_matrix
+```
+
+
+#### KNN con K = 1
+
+
+Con un modelo de KNN obtenemos una exactitud del 50%
+
+
+
+
+```{r}
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+knn.pred <- class::knn(as.matrix(train$Lag2),as.matrix(val$Lag2),as.matrix(train$Direction),k=1)
+
+y_real = val$Direction
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+Podemos ver que para este conjunto de datos el modelo que mejor se comporta es el de LDA 
+
+### Ajuste de parametros 
+
+#### LDA con todos los atributos
+
+Usando todos los atributos para el LDA obtenemos una exactitud del 46%, por lo que vemos que baja su rendimiento
+
+```{r}
+
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+lda.fit <- MASS::lda(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume,data = train, family= "binomial")
+
+lda.pred = predict(lda.fit, select(val,Lag1,Lag2,Lag3,Lag4,Lag5,Volume))
+
+y_real = val$Direction
+confusion_matrix <- table(lda.pred$class, y_real)
+confusion_matrix
+```
+
+
+
+#### LDA con las 3 variables mas relevantes
+
+Si usamos los tres atributos con mejores p-valores obtenemos un rendimiento de 60%, por lo que vemos que tambíen baja su rendimiento 
+```{r}
+
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+lda.fit <- MASS::lda(Direction ~ Lag1 + Lag2 + Lag4,data = train, family= "binomial")
+
+lda.pred = predict(lda.fit, select(val,Lag1,Lag2,Lag4))
+
+y_real = val$Direction
+confusion_matrix <- table(lda.pred$class, y_real)
+confusion_matrix
+```
+
+
+
+#### LDA con las 2 variables mas relevantes
+
+Si usamos los tres atributos con mejores p-valores obtenemos un rendimiento de 57%, por lo que vemos que tambíen baja su rendimiento 
+```{r}
+
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+lda.fit <- MASS::lda(Direction ~ Lag1 + Lag2 ,data = train, family= "binomial")
+
+lda.pred = predict(lda.fit, select(val,Lag1,Lag2))
+
+y_real = val$Direction
+confusion_matrix <- table(lda.pred$class, y_real)
+confusion_matrix
+```
+
+
+
+#### KNN con K = 3
+
+con K = 3 obtenemos una exactitud de 50%
+
+```{r}
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+knn.pred <- class::knn(as.matrix(train$Lag2),as.matrix(val$Lag2),as.matrix(train$Direction),k=1)
+
+y_real = val$Direction
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+
+#### KNN con K = 9
+
+con k = 9 obtenemos una exactitud de 50 %
+
+por lo que vemos que un aumento en K no logra aumentar el rendimiento del predictor
+
+```{r}
+train = filter(Weekly,Year < 2009)
+val = filter(Weekly, Year >= 2009)
+
+knn.pred <- class::knn(as.matrix(train$Lag2),as.matrix(val$Lag2),as.matrix(train$Direction),k=1)
+
+y_real = val$Direction
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+
+
+
+
+
+## Ejercicio 11
+
+### Auto
+
+Millaje de gasolina, caballos de fuerza y otra información para 392 vehículos.
+
+
+- mpg: millas por galón
+
+- cylinders: Número de cilindros entre 4 y 8
+
+- displacement: Desplazamiento del motor (pulgadas cúbicas)
+
+- horsepower: Potencia del motor
+
+- weight: Peso del vehículo (libras)
+
+- acceleration: Tiempo para acelerar de 0 a 60 mph (seg.)
+
+- year: Año del modelo (módulo 100)
+
+- origin: Origen del automóvil (1. Americano, 2. Europeo, 3. Japonés)
+
+- name: Nombre del vehículo
+
+```{r}
+Auto$mpg01 <- rep(0,length(Auto$mpg))
+Auto$mpg01[Auto$mpg > mean(Auto$mpg)] = 1
+head(Auto)
+
+```
+
+
+```{r}
+summary(Auto)
+```
+
+```{r}
+pairs(Auto)
+```
+se ve que la varibale "mpg01" tiene cierta correlación con las variables "cylinders","weight" y "displacement".
+
+
+```{r}
+cor(select(Auto,mpg,cylinders,displacement,horsepower,weight,acceleration,year,origin,mpg01))
+```
+
+
+
+##### División de datos 
+
+Se hace una partición 80/20, 80 para entrenamiento y 20 para validación
+
+```{r}
+trainids <- caret::createDataPartition(Auto$mpg01,p=0.8,list = F)
+train <- Auto[trainids,]
+val <- Auto[-trainids,]
+```
+
+##### LDA
+
+Con LDA se obtiene una exactitud de 91%, con un error del 9%
+
+```{r}
+lda.fit <- MASS::lda(mpg01 ~ cylinders + weight + displacement,data = train)
+
+lda.pred = predict(lda.fit, select(val,cylinders,weight,displacement))
+
+y_real = val$mpg01
+confusion_matrix <- table(lda.pred$class, y_real)
+confusion_matrix
+```
+
+
+
+##### QDA 
+
+Con QDA se obtiene una exactitud de 92%, con un error del 8%.
+```{r}
+qda.fit <- MASS::qda(mpg01 ~ cylinders + weight + displacement,data = train)
+
+qda.pred = predict(qda.fit, select(val,cylinders,weight,displacement))
+
+
+
+y_real = val$mpg01
+confusion_matrix <- table(qda.pred$class, y_real)
+confusion_matrix
+```
+
+
+
+#### Regresión Logística
+
+Con la regresión logística obtenemos una exactitud del 87%, y un error del 13%
+
+```{r}
+logistica.fit <- glm(mpg01 ~ cylinders + weight + displacement,data = train, family= "binomial")
+
+logistica.prob = predict(logistica.fit, select(val,cylinders , weight , displacement))
+
+logistica.class <- rep(0,length(logistica.prob))
+logistica.class[logistica.prob > 0.5] = 1
+
+y_real = val$mpg01
+confusion_matrix <- table(logistica.class, y_real)
+confusion_matrix
+```
+
+
+
+
+#### KNN con k=1
+
+Para un KNN con K=1 obtenemos una exactitud del 85% y un error del 15%
+```{r}
+knn.pred <- class::knn(as.matrix(train$cylinders+ train$weight + train$displacement),as.matrix(val$cylinders+ val$weight + val$displacement),as.matrix(train$mpg01),k=5)
+
+y_real = val$mpg01
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+#### KNN con k=50
+
+Para un KNN con K = 50 obtenemos una exactitud del 89% y un error del 11%, por lo que vemos que el rendimiento aumenta a medida que aumenta K
+
+```{r}
+knn.pred <- class::knn(as.matrix(train$cylinders+ train$weight + train$displacement),as.matrix(val$cylinders+ val$weight + val$displacement),as.matrix(train$mpg01),k=50)
+
+y_real = val$mpg01
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+ 
+#### KNN con k=150
+
+Y por ultimo para un KNN con K = 150, obtenemos una exactitud del 91% con un error del 9%
+
+```{r}
+knn.pred <- class::knn(as.matrix(train$cylinders+ train$weight + train$displacement),as.matrix(val$cylinders+ val$weight + val$displacement),as.matrix(train$mpg01),k=150)
+
+y_real = val$mpg01
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+
+
+
+Donde podemos ver que los modelos que mejor se comportan para este conjunto de datos son el KNN con K = 150, el QDA y el LDA,los cuales tienen exactitudes muy similares.
+
+
+
+## Ejercicio 12
+
+### Power
+
+```{r}
+Power <- function(){
+print(2^3)
+}
+Power()
+```
+### Power2()
+
+```{r}
+Power2<- function(x,a){
+print(x^a)
+}
+Power2(3,8)
+```
+```{r}
+Power2(10,3)
+Power2(8,17)
+Power2(131,3)
+```
+
+### Power 3
+
+```{r}
+Power3<- function(x,a){
+  return(Power2(x,a))
+}
+```
+
+
+```{r}
+x = 1:10
+plot(x, Power3(x, 2), log = "xy", 
+     ylab = "y = x^2 en escala logaritmica", xlab = "x en escala logaritmica", 
+    main = "x^2 VS x en escala logaritmica")
+```
+
+#### PlotPower
+
+```{r}
+PlotPower<- function(x,a){
+  plot(x, Power3(x, a), log = "xy", 
+     ylab = paste("y = x^",a," en escala logaritmica"), xlab = "x en escala logaritmica", 
+    main = paste("x^",a," VS x en escala logaritmica"))
+}
+PlotPower(1:10,3)
+```
+
+## Ejercicio 13
+
+### Boston Dataset
+
+```{r}
+boston<- MASS::Boston
+summary(boston)
+```
+las variables "nox" vs "indus", "age" y "crim" presentan patrones visuales
+
+```{r}
+pairs(boston)
+```
+las variables  "tax" y "rad" presentan una correlación muy alta.
+
+```{r}
+cor(boston)
+```
+ 
+
+#### Calcular crime01
+
+```{r}
+boston$crim01 <- rep(0,length(boston$crim))
+boston$crim01[boston$crim > mean(boston$crim)] = 1
+head(boston)
+
+```
+```{r}
+summary(boston)
+```
+
+#### Particionamiento de datos para entrenamiento y validacion 
+
+Se hace una partición 80/20, 80 para entrenamiento y 20 para validación
+
+```{r}
+trainids <- caret::createDataPartition(boston$crim01,p=0.8,list = F)
+train <- boston[trainids,]
+val <- boston[-trainids,]
+
+```
+
+#### Regresión Logística
+
+Para la regresión logística con todas las variables obtenemos una exactitud de 99%
+
+```{r}
+logistica.fit <- glm(crim01 ~  zn+indus+chas+nox+rm+age+dis+rad+tax+ptratio+black+lstat+medv,data = train, family= "binomial")
+
+logistica.prob = predict(logistica.fit, select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv))
+
+logistica.class <- rep(0,length(logistica.prob))
+logistica.class[logistica.prob > 0.5] = 1
+
+
+y_real = val$crim01
+confusion_matrix <- table(logistica.class, y_real)
+print(confusion_matrix)
+```
+
+```{r}
+summary(logistica.fit)
+```
+
+
+Si tomamos las mejores variables segun su valor-p obtenemos un modelo con 2 variables "rm" y "age" y una exactitud del 74%
+
+```{r}
+logistica.fit <- glm(crim01 ~  rm+age,data = train, family= "binomial")
+
+logistica.prob = predict(logistica.fit, select(val,rm,age))
+
+logistica.class <- rep(0,length(logistica.prob))
+logistica.class[logistica.prob > 0.5] = 1
+
+y_real = val$crim01
+confusion_matrix <- table(logistica.class, y_real)
+print(confusion_matrix)
+```
+
+
+
+
+
+#### LDA
+
+Con el modelo LDA obtenemos una exactitud del 100%
+
+```{r}
+lda.fit <- MASS::lda(crim01 ~  zn+indus+chas+nox+rm+age+dis+rad+tax+ptratio+black+lstat+medv,data = train)
+
+lda.pred = predict(lda.fit, select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv))
+
+y_real = val$crim01
+confusion_matrix <- table(lda.pred$class, y_real)
+confusion_matrix
+```
+
+
+
+
+#### KNN K = 50
+
+con un KNN con K=50 obtenemos una exactitud del 91%
+```{r}
+knn.pred <- class::knn(as.matrix(train$zn+ train$indus+ train$chas+ train$nox+ train$rm+ train$age+ train$dis+ train$rad+ train$tax+ train$ptratio+ train$black+ train$lstat+ train$medv),as.matrix(val$zn+ val$indus+ val$chas+ val$nox+ val$rm+ val$age+ val$dis+ val$rad+ val$tax+ val$ptratio+ val$black+ val$lstat+ val$medv),as.matrix(train$crim01),k=50)
+
+y_real = val$crim01
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+
+
+#### KNN K = 200
+
+Con KNN y K= 200 baja el rendimiento en la predicción con una exactitud del 70%, y se ve que el clasificador tiende a clasificar todo como negativo.
+
+
+
+```{r}
+knn.pred <- class::knn(as.matrix(train$zn+ train$indus+ train$chas+ train$nox+ train$rm+ train$age+ train$dis+ train$rad+ train$tax+ train$ptratio+ train$black+ train$lstat+ train$medv),as.matrix(val$zn+ val$indus+ val$chas+ val$nox+ val$rm+ val$age+ val$dis+ val$rad+ val$tax+ val$ptratio+ val$black+ val$lstat+ val$medv),as.matrix(train$crim01),k=200)
+
+y_real = val$crim01
+confusion_matrix <- table(knn.pred, y_real)
+confusion_matrix
+```
+Entre los modelos utilizados vemos que el LDA obtiene una exactitud del 100% en el conjunto de validación, convirtiendose en el clasificador con mayor rendimiento de los utilizados.
+
+# Apartado 8.4
+
+## Ejercicio 7
+
+Usando el dataset de Boston, vamos a predecir los crimenes con la técnica de Bosques Aleatorios
+
+#### Particion de datos
+
+```{r}
+boston<- MASS::Boston
+trainids <- caret::createDataPartition(boston$crim,p=0.8,list = F)
+train <- boston[trainids,]
+val <- boston[-trainids,]
+```
+
+
+Calculamos los valores para mtry = {p,p/2,raiz(p)} que es el numero de variables random, donde la funcion randomForest() utiliza por defecto p/2 de variables aleatorias para cada arbol cuando es regresión y raiz(p) cuando es clasificación.
+
+Donde podemos ver segun el grafico, que dichos valores para las variables aleatorias se cumple en la practica también, ya que en este caso que estamos usando en Bosque Aleatorio para una regresión, se ve que el modelo que mejor se comporta en cuanto al error es el que tiene un numero de variables aleatorias igual a p/2
+
+```{r}
+p = length(colnames(boston)) - 1
+pc = sqrt(p)
+pr = p / 2
+bosque.boston.p = randomForest::randomForest(crim ~.,data=train ,xtest = select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv),ytest= val$crim,mtry=p, ntree= 500, importance =TRUE)
+#bosque.boston.p = predict(bosque.boston.p.fit,select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv))
+
+
+bosque.boston.pc = randomForest::randomForest(crim ~.,data=train, xtest = select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv),ytest= val$crim,mtry=pc, ntree= 500, importance =TRUE)
+
+
+bosque.boston.pr = randomForest::randomForest(crim ~.,data=train, xtest = select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv),ytest= val$crim,mtry=pr, ntree= 500, importance =TRUE)
+#bosque.boston.pr = predict(bosque.boston.p.fit,select(val,zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,black,lstat,medv))
+
+
+plot(1:500, bosque.boston.p$test$mse, col = "green", type = "l", xlab = "Number of Trees", 
+    ylab = "Test MSE", ylim = c(10, 30))
+lines(1:500, bosque.boston.pc$test$mse, col = "red", type = "l")
+lines(1:500, bosque.boston.pr$test$mse, col = "blue", type = "l")
+legend("topright", c("m=p", "m=p/2", "m=sqrt(p)"), col = c("green", "red", "blue"), 
+    cex = 1, lty = 1)
+
+
+# plot(1:500, bosque.boston.p$test$mse, xlab = "Número de Árboles", col = "yellow",
+#     ylab = "MSE", ylim = c(10, 19))
+# lines(1:500, bosque.boston.pc$test$mse,col="red")
+# lines(1:500, bosque.boston.pr$test$mse ,col="blue" )
+# legend("topright", c("mtry=p", "mtry=p/2", "mtry=sqrt(p)"), col = c("yellow", "red", "blue"), 
+#     cex = 1, lty = 1)
+```
+
+
+## Ejercicio 8
+
+
+### Dataset Carseats
+
+Un conjunto de datos simulados que contiene las ventas de asientos de seguridad para niños en 400 tiendas diferentes.
+
+- Sales: Ventas unitarias (en miles) en cada ubicación
+
+- CompPrice: Precio cobrado por la competencia en cada ubicación
+
+- Income: Nivel de ingresos de la comunidad (en miles de dólares)
+
+- Advertising: Presupuesto de publicidad local para la empresa en cada ubicación (en miles de dólares)
+
+- Population: Tamaño de la población en la región (en miles)
+
+- Price: Precio que cobra la empresa por los asientos de seguridad en cada sitio
+
+- ShelveLoc: Un factor con niveles Bad, Good y Mediumque indica la calidad de la ubicación estanterías para los asientos de seguridad en cada sitio
+
+- Age: Edad media de la población local
+
+- Education: Nivel de educación en cada ubicación
+
+- Urban: Un factor con niveles Noy Yespara indicar si la tienda está en una ubicación urbana o rural.
+
+- US: Un factor con niveles Noy Yespara indicar si la tienda está en EE. UU. O no
+
+```{r}
+summary(Carseats)
+```
+
+
+#### Particion de datos
+
+Se hace una partición 80/20, 80 para entrenamiento y 20 para validación
+
+```{r}
+Carseats <- ISLR::Carseats
+trainids <- caret::createDataPartition(Carseats$Sales,p=0.8,list = F)
+train <- Carseats[trainids,]
+val <- Carseats[-trainids,]
+```
+
+
+
+
+##### Árbol de Decisión
+
+Como podemos ver graficando el arbol, la variable mas representativa para la predicción y por la cual hacemos el primer filtro es "ShelveLoc" luego tenemos que el filtro del arbol se distribuye por la variable "Price" y asi hasta llegar a los nodo, en los cuales tenemos variables como "Price", "Income", "Population", entre otras.
+
+```{r}
+library(tree)
+arbol.fit = tree::tree(Sales ~ ., data = train)
+plot(arbol.fit)
+text(arbol.fit, pretty = 0)
+title(main = "Árbol de Desición")
+```
+
+
+
+
+
+
+
+
+```{r}
+summary(arbol.fit)
+```
+
+Con el este árbol, obtenemos un MSE de 4,5
+
+```{r}
+arbol.pred = predict(arbol.fit, select(val,CompPrice,Income,Advertising,Population,Price,ShelveLoc,Age,Education,Urban,US))
+mean((val$Sales - arbol.pred)^2)
+```
+
+
+
+
+
+#### Validación cruzada
+
+Realizamos una validación cruzada con 5 folds, donde vemos que los tipos de arboles que obtienen menor error, son los que tienen tamaño de 15, pero podemos mirar que una poda a un arbol de tamaño 9, genera un error muy similar, por lo cual se podría trabajar con este.
+
+```{r}
+arbol.cv = tree::cv.tree(arbol.fit,K=5)
+plot(arbol.cv$size, (arbol.cv$dev / 14), type = "b",xlab = "Tamaño de Árbol", ylab = "MSE")
+```
+
+```{r}
+arbol.best =  prune.tree(arbol.fit, best = 9)
+plot(arbol.best)
+text(arbol.best, pretty = 0)
+title(main = "Mejor Árbol de Decisión")
+```
+
+Con el mejor arbol podado obtenemos un MSE de 4,9
+
+```{r}
+arbol.best.pred = predict(arbol.best, select(val,CompPrice,Income,Advertising,Population,Price,ShelveLoc,Age,Education,Urban,US))
+mean((val$Sales - arbol.best.pred)^2)
+```
+
+#### Bagging
+
+
+
+```{r}
+bagging.fit = randomForest::randomForest( Sales ~ ., data = train ,mtry=13,importance =TRUE)
+randomForest::importance(bagging.fit)
+```
+
+
+```{r}
+bagging.pred = predict(bagging.fit, select(val,CompPrice,Income,Advertising,Population,Price,ShelveLoc,Age,Education,Urban,US))
+mean((val$Sales - bagging.pred)^2)
+
+```
+
+
+
+#### RandomForest
+
+
+```{r}
+bagging.fit = randomForest::randomForest( Sales ~ ., data = train ,mtry=4,importance =TRUE)
+randomForest::importance(bagging.fit)
+```
+
+
+```{r}
+bagging.pred = predict(bagging.fit, select(val,CompPrice,Income,Advertising,Population,Price,ShelveLoc,Age,Education,Urban,US))
+mean((val$Sales - bagging.pred)^2)
+
+```
+
+
+
+
+## Ejercicio 9
+
+### Particion de datos
+
+```{r}
+trainids = sample(dim(OJ)[1], 800)
+train = OJ[trainids, ]
+val = OJ[-trainids, ]
+```
+
+
+
+### Árbol de Decisión
+
+```{r}
+arbol.fit = tree::tree(Purchase ~ ., data = train)
+```
+
+Como podemos ver en el resumen del árbol, el error de entrenamiento fue de 0.1538 y el árbol final tiene 7 nodos
+
+```{r}
+summary(arbol.fit)
+```
+En esta sección obtenemos las ramas del árbol en formato texto, donde se muestran sus ramas,raices,nodos,propiedades de división y los umbrales
+
+```{r}
+arbol.fit
+```
+
+Ahora vemos un grafico del árbol final, donde vemos sus ramas y los atributos de decisión, siendo su atributo principal el "LoyalCH" el cual es el primer filtro que realiza para comenzar la predicción, seguido de atributos como "SalePriceMM", "PriceDiff" entre otros.
+
+```{r}
+plot(arbol.fit)
+text(arbol.fit, pretty = 0)
+title(main = "Árbol de Desición")
+```
+
+
+
+
+ Como podemos ver en esta matriz de confusión, el modelo obtienen una exactitud del 77%
+ 
+```{r}
+arbol.pred = predict(arbol.fit, select(val,-Purchase),type = "class")
+table(val$Purchase,arbol.pred)
+
+```
+
+Con una validación cruzada de 5 folds, se obtiene que el mejor tamaño para el árbol es de 5
+
+```{r}
+arbol.cv = cv.tree(arbol.fit,K=5)
+plot(arbol.cv$size, (arbol.cv$dev / 14), type = "b",xlab = "Tamaño de Árbol", ylab = "MSE")
+```
+
+
+
+```{r}
+arbol.best =  prune.tree(arbol.fit, best = 9)
+plot(arbol.best)
+text(arbol.best, pretty = 0)
+title(main = "Mejor Árbol de Decisión")
+```
+Como podemos ver, el mejor árbol obtienen una exactitud del 77%, lo cual no se haya un aumento en el rendimiento.
+
+```{r}
+arbol.best.pred = predict(arbol.best, select(val,-Purchase),type = "class")
+table(val$Purchase,arbol.best.pred)
+```
+
+
+
+
+
+
+
+## Ejercicio 10 
+
+### Hitters Dataset
+
+Este conjunto de datos se deduce del Baseballconjunto de datos de fildeo: el rendimiento de fildeo básicamente incluye el número de Errores, Putouts y Asistencias realizadas por cada jugador. Para reducir el número de observaciones, se comprimió calculando el número medio de errores, putouts y asistencias de cada equipo y solo para 6 posiciones (1B, 2B, 3B, C, OF, SS y UT). Además, cada una de estas tres variables se escaló a un rango común dividiendo cada variable por el máximo de la variable.
+
+-  Positions: factor que indica la posición de campo (1B = primera base, 2B = segunda base, 3B = tercera base, C = receptor, OF = jardinero, SS = parada corta, UT = jugadores utilitarios).
+
+- Putouts: Ocurre cuando un fildeador hace que un jugador contrario sea tocado o forzado a out.
+
+- Assist: son acreditados a otros jardineros involucrados en hacer ese lanzamiento.
+
+- Errors: contar los errores cometidos por un jugador.
+
+
+
+#### Eliminar NAN para "Salary" y aplicarle una trasnformacion logaritmica
+```{r}
+hitters = Hitters[!is.na(Hitters$Salary),]
+hitters$Salary <- log(hitters$Salary)
+head(hitters)
+```
+#### Partición de datos
+
+```{r}
+trainids = sample(dim(hitters)[1], 200)
+train = hitters[trainids, ]
+val = hitters[-trainids, ]
+```
+
+
+#### Boosting
+
+Errores de Entrenamiento para distintos valores de lambda
+
+```{r}
+lam = c(0.001,0.01,0.1,0.2)
+errors = rep(0,length(lam))
+```
+
+
+```{r}
+for(i in 1:length(lam)){
+  boost.fit=gbm::gbm(Salary ∼ .,data=train,n.trees=1000, shrinkage = lam[i])
+  boost.pred = predict(boost.fit, select(train,-Salary))
+  
+    
+  errors[i] = mean((val$Salary - boost.pred)^2)
+  
+}
+
+plot(lam, errors, type = "b", xlab = "Shrinkage", ylab = "MSE", 
+    col = "blue")
+
+```
+
+
+Errores de validación para distitnos valores de lambda
+
+```{r}
+lam = c(0.001,0.01,0.1,0.2)
+errors = rep(0,length(lam))
+for(i in 1:length(lam)){
+  boost.fit=gbm::gbm(Salary ∼ .,data=train,n.trees=1000, shrinkage = lam[i])
+  boost.pred = predict(boost.fit, select(val,-Salary), n.trees = 1000)
+  
+    
+  errors[i] = mean((val$Salary - boost.pred)^2)
+  
+}
+
+plot(lam, errors, type = "b", xlab = "Shrinkage", ylab = "MSE", 
+    col = "blue")
+
+```
+
+
+el minimo MSE de validación fue de 0.18
+
+```{r}
+min(errors)
+```
+
+
+
+##### Regresión Lineal
+
+Para la regresión lineal el MSE de validación fue de 0.3 siendo mas alto que el del boosting
+
+```{r}
+linear.fit <- lm(Salary ~ ., data = train, family= "binomial")
+
+linear.pred = predict(linear.fit,select(val,-Salary),type = "response")
+
+
+mean((val$Salary - linear.pred)^2)
+
+```
+
+##### Las variables mas importantes en el Boosting
+
+La variable mas importante es "CWalts"
+
+```{r}
+boost.best=gbm::gbm(Salary ∼ .,data=train,n.trees=1000, shrinkage = 0.01)
+summary(boost.best)
+
+```
+#### Bagging
+
+ Con un bagging obtenemos un error mejor que con el método lineal, pero sigue teniendo mejor rendimiento el boosting
+
+```{r}
+bagging.fit = randomForest::randomForest( Salary ~ ., data = train ,mtry=13,importance =TRUE)
+bagging.pred = predict(bagging.fit,select(val,-Salary),type = "response")
+
+mean((val$Salary - bagging.pred)^2)
+```
+
+
+
+
+
+## Ejercicio 11
+
+### Caravan Dataset
+
+Los datos contienen 5822 registros de clientes reales. Cada registro consta de 86 variables, que contienen datos sociodemográficos (variables 1-43) y propiedad del producto (variables 44-86). Los datos sociodemográficos se derivan de códigos postales. Todos los clientes que viven en áreas con el mismo código postal tienen los mismos atributos sociodemográficos. La variable 86 ( Purchase) indica si el cliente adquirió una póliza de seguro de caravana. Puede obtener más información sobre las variables individuales en http://www.liacs.nl/~putten/library/cc2000/data.html
+
+#### Partición de datos
+
+```{r}
+Caravan = ISLR::Caravan
+Caravan$Purchase01 <-ifelse(Caravan$Purchase == "Yes", 1, 0)
+Caravan = select(Caravan,-Purchase)
+trainids = sample(dim(Caravan)[1], 100)
+train = Caravan[trainids, ]
+val = Caravan[-trainids, ]
+```
+
+
+```{r}
+unique(Caravan$Purchase01)
+
+```
+
+
+#### Boosting
+
+Donde vemos que el atributo mas importante es "MSKA"
+
+```{r}
+boost.fit=gbm::gbm(Purchase01 ∼ .,data=train,n.trees=1000, shrinkage = 0.01)
+summary(boost.fit)
+
+
+```
+
+Con un umbral de clasificacion del 20%, tenemos una exactitud de validación de 91%
+```{r}
+boost.prob = predict(boost.fit, select(val,-Purchase01))
+boost.pred = ifelse(boost.prob > 0.2, 1, 0)
+vali = val$Purchase01
+table(vali, boost.pred)
+
+```
+
+#### Regresión Logistica
+
+Con un umbral de clasificación del 20% y utilizando una regresión logística, obtenemos una exactitud de validación de 76%
+```{r}
+lm.fit = glm(Purchase01 ~ ., data = train, family = binomial)
+lm.prob = predict(lm.fit, select(val,-Purchase01), type = "response")
+lm.pred = ifelse(lm.prob > 0.2, 1, 0)
+table(val$Purchase, lm.pred)
+```
+
+
+
+## Ejercicio 12
+
+Para este ejercicio se escogera el dataset Auto
+
+### Auto
+
+Millaje de gasolina, caballos de fuerza y otra información para 392 vehículos.
+
+
+- mpg: millas por galón
+
+- cylinders: Número de cilindros entre 4 y 8
+
+- displacement: Desplazamiento del motor (pulgadas cúbicas)
+
+- horsepower: Potencia del motor
+
+- weight: Peso del vehículo (libras)
+
+- acceleration: Tiempo para acelerar de 0 a 60 mph (seg.)
+
+- year: Año del modelo (módulo 100)
+
+- origin: Origen del automóvil (1. Americano, 2. Europeo, 3. Japonés)
+
+- name: Nombre del vehículo
+
+```{r}
+Auto <- ISLR::Auto
+Auto$mpg01 <- rep(0,length(Auto$mpg))
+Auto$mpg01[Auto$mpg > mean(Auto$mpg)] = 1
+Auto = select(Auto,-name)
+head(Auto)
+
+```
+
+
+
+### Particion de datos
+
+Se hara una particion 80/20, 80 para entrenamiento y 20 para la validación
+
+```{r}
+trainids <- caret::createDataPartition(Auto$horsepower,p=0.8,list = F)
+train <- Auto[trainids,]
+val <- Auto[-trainids,]
+
+```
+
+
+
+### Regresión Logistica
+
+Con un umbral de clasificación del 20% y una regrsión logistica, obtenemos una exactitud del 100%
+
+```{r}
+lm.fit = glm(mpg01 ~ ., data = train, family = binomial)
+lm.prob = predict(lm.fit, select(val,-mpg01), type = "response")
+lm.pred = ifelse(lm.prob > 0.5, 1, 0)
+table(val$mpg01, lm.pred)
+
+```
+
+
+### Boosting
+
+Con boosting también obtenemos 100% de exactitud en el conjunto de validación
+
+```{r}
+boost.fit=gbm::gbm(mpg01 ∼ .,data=train,n.trees=1000, shrinkage = 0.01)
+boost.prob = predict(boost.fit, select(val,-mpg01))
+boost.pred = ifelse(boost.prob > 0.5, 1, 0)
+table(val$mpg01, boost.pred)
+
+```
+
+
+
+### Bagging
+
+Con un baggin obtenemos una exactitud del 100% para el conjunto de validación.
+```{r}
+
+bagging.fit = randomForest::randomForest( mpg01 ~ ., data = train ,mtry=13,importance =TRUE)
+bagging.prob = predict(bagging.fit,select(val,-mpg01),type = "response")
+bagging.pred = ifelse(bagging.prob > 0.5, 1, 0)
+table(val$mpg01, bagging.pred)
+```
+
+
+
+### Bosque aleatorio
+
+Con el bosque aleatorio también obtenemos un 100% de exactitud en el conjunto de validación
+```{r}
+bosque.fit = randomForest::randomForest( mpg01 ~ ., data = train ,mtry=2,importance =TRUE)
+bosque.prob = predict(bosque.fit,select(val,-mpg01),type = "response")
+bosque.pred = ifelse(bosque.prob > 0.5, 1, 0)
+table(val$mpg01, bosque.pred)
+```
+
+
+
+Teniendo en cuenta los errores de validación de los distintos modelos, podemos decir que todos presentan un rendimiento muy alto e igual.
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Apartado 9.7
+
+## Ejercicio 4
+
+
+Crearemos un conjunto de datos de dos clases
+
+```{r}
+x1=rnorm(100) -0.5
+x2=rnorm(100) -0.5
+y=1*(x1-x2^2 > 0)
+data = data.frame(y = y,x1=x1,x2=x2)
+trainids = sample(dim(data)[1], 80)
+train = data[trainids,]
+val = data[-trainids,]
+plot(x1[y==0],x2[y==0],col = "blue")
+points(x1[y==1],x2[y==1],col = "green")
+```
+
+
+
+
+
+#### SVM con kernel Lineal
+
+```{r}
+library(e1071)
+svm.fit=svm(y ∼., data=train , kernel ="linear")
+svm.prob = predict(svm.fit,select(train,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+print("Entrenamiento")
+table(train$y - svm.pred)
+svm.prob = predict(svm.fit,select(val,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+print("Validación")
+table(val$y - svm.pred)
+```
+
+
+
+```{r}
+plot(train$x1[svm.pred==0],train$x2[svm.pred==0],col = "blue")
+points(train$x1[svm.pred==1],train$x2[svm.pred==1],col = "green")
+```
+
+
+
+### SVM con kernel Polinomial
+```{r}
+svm.fit=svm(y ∼., data=train , kernel ="polynomial")
+svm.prob = predict(svm.fit,select(train,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+print("Entrenamiento")
+table(train$y - svm.pred)
+svm.prob = predict(svm.fit,select(val,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+print("Validación")
+table(val$y - svm.pred)
+```
+
+```{r}
+plot(svm.fit, train)
+```
+
+
+#### SVM con kernel radial
+```{r}
+svm.fit=svm(y ∼., data=train , kernel ="radial")
+svm.prob = predict(svm.fit,select(train,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+print("Entrenamiento")
+table(train$y,svm.pred)
+svm.prob = predict(svm.fit,select(val,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+print("Validación")
+table(val$y,svm.pred)
+
+```
+
+```{r}
+plot(svm.fit, train)
+```
+
+
+Como podemos ver, de los tipos de kernel utilizados para entrenar una svm, para este conjunto de datos podemos ver que el kernel que mejor se comporta es el polinomial, seguido del radial, y el de menor rendimiento es el kernel lineal
+
+
+
+#### Ejercicio 5
+
+
+```{r}
+x1=runif (500) -0.5
+x2=runif (500) -0.5
+y=1*(x1^2-x2^2 > 0)
+data = data.frame(y = y,x1=x1,x2=x2)
+plot(x1[y==0],x2[y==0],col = "blue")
+points(x1[y==1],x2[y==1],col = "green")
+```
+
+#### Regresión Logistica
+
+con la regresión logística obtenemos una exactitud del 55%
+```{r}
+lm.fit = glm(y ~ ., data = data, family = binomial)
+lm.prob = predict(lm.fit, select(data,-y), type = "response")
+lm.pred = ifelse(lm.prob > 0.5, 1, 0)
+table(data$y, lm.pred)
+
+
+```
+```{r}
+plot(x1[lm.pred==0],x2[lm.pred==0],col = "blue")
+points(x1[lm.pred==1],x2[lm.pred==1],col = "green")
+```
+
+
+
+#### Regresión logistica con transformaciones en los atributos
+
+con estas transofrmaciones obtenemos una exactitud del 90%, lo cual sube mucho el rendimiento del modelo
+```{r}
+data.tran = data.frame(y=data$y,x1=data$x1^2,x2=data$x1*data$x2 ,x3= log(data$x2))
+lm.fit = glm(y ~ ., data = data.tran, family = binomial)
+lm.prob = predict(lm.fit, select(data.tran,-y), type = "response")
+lm.pred = ifelse(lm.prob > 0.5, 1, 0)
+table(data.tran$y, lm.pred)
+```
+
+y vemos que las fronteras de decision ahora ya no son lineales
+
+```{r}
+plot(x1[lm.pred==0],x2[lm.pred==0],col = "blue")
+points(x1[lm.pred==1],x2[lm.pred==1],col = "green")
+```
+
+
+
+#### SVM con kernel lineal
+con una svm y un kernel lineal obtenemos una exatitud del 65%
+```{r}
+library(e1071)
+svm.fit=svm(y ∼ x1 + x2 , data = data,kernel ="linear")
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+table(data$y, svm.pred)
+```
+
+```{r}
+#plot(x1[svm.pred==0],x2[svm.pred==0],col = "blue")
+#points(x1[svm.pred==1],x2[svm.pred==1],col = "green")
+```
+
+#### SVM con kernel polinomial
+
+con una svm y un kernel polynomial también obtenemos una exatitud del 63%
+```{r}
+svm.fit=svm(y∼., data=data , kernel ="polynomial")
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+table(data$y, svm.pred)
+```
+
+```{r}
+#plot(x1[svm.pred==0],x2[svm.pred==0],col = "blue",xlim = 10)
+#points(x1[svm.pred==1],x2[svm.pred==1],col = "green",xlim = 10)
+```
+
+
+En donde podemos notar que la regresión logistica con transformaciones en los atributos genera resultados muy prometedores y un rendimiento muy alto.
+
+#### Ejercicio 6
+
+
+
+```{r}
+x1=runif (100) -0.5
+x2=runif (100) -0.5
+y=1*(x1-x2 > 0)
+data = data.frame(y = y,x1=x1,x2=x2)
+plot(x1[y==0],x2[y==0],col = "blue")
+points(x1[y==1],x2[y==1],col = "green")
+```
+Como se puede ver en los resultados de la afinación del parametro de costo, el parametro de costo que me disminuye el error es costo = 5
+
+```{r}
+tune.out = tune(svm, y ~ ., data = data, kernel = "linear", ranges = list(cost = c(0.1, 1, 5, 10)) )
+summary(tune.out)
+```
+
+Generamos un dataset de validación
+```{r}
+x1=runif (30) -0.5
+x2=runif (30) -0.5
+y=1*(x1-x2 > 0)
+val = data.frame(y = y,x1=x1,x2=x2)
+plot(x1[y==0],x2[y==0],col = "blue")
+points(x1[y==1],x2[y==1],col = "green")
+
+```
+#### Costo = 0.1
+
+```{r}
+library(e1071)
+svm.fit= svm(y∼., data=data , kernel ="linear",cost =0.1)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <- table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Entrenamiento")
+print(OA)
+print(accmat)
+
+svm.fit=svm(y ∼., data=val , kernel ="linear",cost =0.1)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <-table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Validación")
+print(OA)
+print(accmat)
+```
+
+
+
+#### Costo = 1
+
+```{r}
+svm.fit= svm(y∼., data=data , kernel ="linear",cost =1)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <- table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Entrenamiento")
+print(OA)
+print(accmat)
+
+svm.fit=svm(y ∼., data=val , kernel ="linear",cost =1)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <-table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Validación")
+print(OA)
+print(accmat)
+```
+
+#### Costo = 5
+
+```{r}
+svm.fit= svm(y∼., data=data , kernel ="linear",cost =5)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <- table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Entrenamiento")
+print(OA)
+print(accmat)
+
+svm.fit=svm(y ∼., data=val , kernel ="linear",cost =5)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <-table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Validación")
+print(OA)
+print(accmat)
+```
+
+#### Costo = 10
+
+```{r}
+svm.fit= svm(y∼., data=data , kernel ="linear",cost =10)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <- table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Entrenamiento")
+print(OA)
+print(accmat)
+
+svm.fit=svm(y ∼., data=val , kernel ="linear",cost =10)
+svm.prob = predict(svm.fit,select(data,-y),type = "response")
+svm.pred = ifelse(svm.prob > 0.5, 1, 0)
+accmat <-table(data$y, svm.pred)
+OA <- (sum(diag(accmat)) / sum(accmat) * 100)
+print("Validación")
+print(OA)
+print(accmat)
+```
+Como podemos ver para este conjunto de datos linealmente separables, el parametro del costo no genera un cambio en el rendimiento del modelo.
+
+
+### Ejercicio 7 
+
+#### Auto Dataset
+```{r}
+library(e1071)
+Auto = ISLR::Auto
+Auto$mpg01 <- rep(0,length(Auto$mpg))
+Auto$mpg01[Auto$mpg > mean(Auto$mpg)] = 1
+Auto = select(Auto,-name)
+head(Auto)
+
+```
+
+#### Afinación del costo para una SVM con kernel lineal
+
+Como podemos ver con un modelo SVM y kernel lineal, el valor del costo que me minimiza el error es costo = 1.0
+```{r}
+tune.out = tune(svm, mpg01 ~ ., data = Auto, kernel = "linear", ranges = list(cost = c(0.1, 1, 5, 10)) )
+summary(tune.out)
+```
+
+
+#### Afinación de parametros para una SVM con kernel Polinomial
+
+
+```{r}
+library(e1071)
+lam = c(0.01, 0.1, 1, 5, 10)
+errors = rep(0,length(lam))
+for(i in 1:length(lam)){
+  boost.fit=svm(mpg01 ∼.,data=Auto,kernel = "polynomial",cost = 1.0, gamma = lam[i])
+  boost.prob = predict(boost.fit, select(Auto,-mpg01))
+  boost.pred = ifelse(boost.pred>0.5,1,0)
+  #accmat <- table(Auto$mpg01,boost.pred)
+  #OA <- 100 - (sum(diag(accmat)) / sum(accmat) * 100)
+  #errors[i] = OA
+
+  errors[i] = mean((Auto$mpg01 - boost.pred)^2)
+  
+}
+
+plot(lam, errors, type = "b", xlab = "Shrinkage", ylab = "Error", 
+    col = "blue")
+```
+
+
+```{r}
+lam = c(1,2,5,10,20)
+errors = rep(0,length(lam))
+for(i in 1:length(lam)){
+  boost.fit=svm(mpg01 ∼.,data=Auto,kernel = "polynomial",cost = 1.0, gamma = 1,degree= lam[i])
+  boost.prob = predict(boost.fit, select(Auto,-mpg01))
+  boost.pred = ifelse(boost.pred>0.5,1,0)
+  #accmat <- table(Auto$mpg01,boost.pred)
+  #OA <- 100 - (sum(diag(accmat)) / sum(accmat) * 100)
+  #errors[i] = OA
+  #print(i)
+  #print(accmat)
+  #print(OA)
+  errors[i] = mean((Auto$mpg01 - boost.pred)^2)
+  
+}
+
+plot(lam, errors, type = "b", xlab = "Shrinkage", ylab = "Error", 
+    col = "blue")
+
+```
+
+
+
+
+#### Afinación de parametros para una SVM con kernel Radial
+
+```{r}
+tune.out = tune(svm, mpg01 ~ ., data = Auto, kernel = "radial", ranges = list(cost = c(0.1, 1, 5, 10) )  )
+summary(tune.out)
+
+```
+
+```{r}
+lam = c(0.01, 0.1, 1, 5, 10)
+errors = rep(0,length(lam))
+for(i in 1:length(lam)){
+  boost.fit=svm(mpg01 ∼.,data=Auto,kernel = "radial",cost = 10.0, gamma = lam[i])
+  boost.prob = predict(boost.fit, select(Auto,-mpg01))
+  boost.pred = ifelse(boost.pred>0.5,1,0)
+  #accmat <- table(Auto$mpg01,boost.pred)
+  #OA <- 100 - (sum(diag(accmat)) / sum(accmat) * 100)
+  #errors[i] = OA
+  #print(i)
+  #print(accmat)
+  #print(OA)
+  errors[i] = mean((Auto$mpg01 - boost.pred)^2)
+  
+}
+
+plot(lam, errors, type = "b", xlab = "Shrinkage", ylab = "Error", 
+    col = "blue")
+```
+
+
+```{r}
+lam = c(1,2,5,10,20)
+errors = rep(0,length(lam))
+for(i in 1:length(lam)){
+  boost.fit=svm(mpg01 ∼.,data=Auto,kernel = "radial",cost = 1.0, gamma = 1,degree= lam[i])
+  boost.prob = predict(boost.fit, select(Auto,-mpg01))
+  boost.pred = ifelse(boost.pred>0.5,1,0)
+  #accmat <- table(Auto$mpg01,boost.pred)
+  #OA <- 100 - (sum(diag(accmat)) / sum(accmat) * 100)
+  #errors[i] = OA
+  #print(i)
+  #print(accmat)
+  #print(OA)
+  errors[i] = mean((Auto$mpg01 - boost.pred)^2)
+  
+}
+
+plot(lam, errors, type = "b", xlab = "Shrinkage", ylab = "Error", 
+    col = "blue")
+
+```
+
+
+
+
+## Ejercicio 8
+
+#### OJ Dataset
+```{r}
+trainids = sample(dim(OJ)[1], 800)
+train = OJ[trainids, ]
+val = OJ[-trainids, ]
+head(OJ)
+```
+
+Con una SVM con kernel lineal obtenemos un exactitud en entrenamiento de 82%, tambien podemos ver que el modelo crea 445 vectores de soporte, 223 para CH y 222 para MM.
+```{r}
+svm.fit=svm(Purchase∼., data=train , kernel ="linear",cost=0.01)
+svm.pred = predict(svm.fit,select(train,-Purchase),type = "response")
+table(train$Purchase, svm.pred)
+summary(svm.fit)
+```
+ y obtenemos un error de validación de 84%
+
+```{r}
+svm.pred = predict(svm.fit,select(val,-Purchase),type = "response")
+table(val$Purchase, svm.pred)
+```
+
+#### Afinación del parametro del costo
+
+el parametro de costo que me minimiza el error es costo = 5
+```{r}
+tune.out = tune(svm, Purchase ~ ., data = train, kernel = "linear", ranges = list(cost = c(0.1, 1, 5, 10)) )
+summary(tune.out)
+```
+
+Con la afinación de este parametro obtenemos una exactitud de 83% para el conjunto de entrenamiento, en donde podemos ver que el rendimiento del modelo sube
+```{r}
+svm.fit=svm(Purchase∼., data=train , kernel ="linear",cost=5.0)
+svm.pred = predict(svm.fit,select(train,-Purchase),type = "response")
+table(train$Purchase, svm.pred)
+```
+
+
+y para la validación obtenemos una exactitud del 84%
+```{r}
+svm.pred = predict(svm.fit,select(val,-Purchase),type = "response")
+table(val$Purchase, svm.pred)
+```
+
+#### SVM con kernel Polinomial
+
+
+```{r}
+tune.out = tune(svm, Purchase ~ ., data = train, kernel = "polynomial", ranges = list(cost = c(0.1, 1, 5, 10)  ) )
+summary(tune.out)
+
+```
+
+el parametro de costo que me minimiza el error es costo = 5 y degree = 2
+```{r}
+tune.out = tune(svm, Purchase ~ ., data = train, kernel = "polynomial", ranges = list(cost = c(0.1, 1, 5, 10),degree=c(1,2,5,10,20)  ) )
+summary(tune.out)
+```
+
+Con la afinación de este parametro obtenemos una exactitud de 83% para el conjunto de entrenamiento, en donde podemos ver que el rendimiento del modelo sube
+```{r}
+svm.fit=svm(Purchase∼., data=train , kernel ="linear",cost=5.0)
+svm.pred = predict(svm.fit,select(train,-Purchase),type = "response")
+table(train$Purchase, svm.pred)
+```
+
+
+y para la validación obtenemos una exactitud del 84%
+```{r}
+svm.pred = predict(svm.fit,select(val,-Purchase),type = "response")
+table(val$Purchase, svm.pred)
+```
+
+
+
+#### SVM con kernel Radial
+
+el parametro de costo que me minimiza el error es costo = 5
+```{r}
+tune.out = tune(svm, Purchase ~ ., data = train, kernel = "radial", ranges = list(cost = c( 1, 5),gamma = c( 1, 5)  ) )
+summary(tune.out)
+```
+
+Con la afinación de este parametro obtenemos una exactitud de 88% para el conjunto de entrenamiento, en donde podemos ver que el rendimiento del modelo sube
+```{r}
+svm.fit=svm(Purchase∼., data=train , kernel ="radial",cost=1.0,gamma=1)
+svm.pred = predict(svm.fit,select(train,-Purchase),type = "response")
+table(train$Purchase, svm.pred)
+
+
+
+```
+
+
+y para la validación obtenemos una exactitud del 77%
+```{r}
+svm.pred = predict(svm.fit,select(val,-Purchase),type = "response")
+table(val$Purchase, svm.pred)
+```
+
+
+
+
+# Ensayo - Inseguridad en Medellín
+
+
+Medellín es una ciudad que ha sido  golpeada por la violencia, la cual tiene sus mayores raíces en la época del narcotráfico en los años 90, en donde llego a ser la ciudad más violenta del mundo; Hoy en día el escenario es muy distinto y más alentador, sin embargo los índices de criminalidad siguen estando activos y convirtiéndose en una de los problemas focos a resolver. Esta situación afecta transversalmente a todas las áreas de la sociedad, en donde los crímenes más comunes son los hurtos a personas, las lesiones personales, homicidios, hurtos de automotores, entre otros.
+
+Dada la revolución tecnológica, el auge de la cuarta revolución industrial, y la gran cantidad de datos de los cuales se tiene acceso público, un enfoque tecnológico para aportar a la solución de estas problemática sería una propuesta interesante a desarrollar, más específicamente se podrían utilizar técnicas de aprendizaje estadístico para implementar tareas como: 
+
+- Clusterización de zonas por características de delitos o niveles de peligro
+
+- Predicción de delitos por tipo y zona
+
+- Predicción de ubicación de exacta de delitos
+
+Estas actividades se podrían llevar a cabo utilizando bases de datos como las publicadas por Grupo Información de Criminalidad, las cuales son abiertas al público, que tienen informaciones relevantes sobre delitos específicos organizadas por tipo de delito. Estas bases de datos se pueden encontrar en la página www.datos.gov.co, algunas de ellas con los siguientes nombres:
+
+- Delito Hurto Personas
+
+- Delito Lesiones Personales
+
+- Delito Homicidio
+
+- Delito Hurto De Motocicletas
+
+Todo esto con el fin de poder generar estrategias tanto individuales, para que las personas en el día a día tengan en cuenta esta información para tomar decisiones correctas y prevenir situaciones no deseables, como también a nivel colectivo, por parte del gobierno y de la Policía Nacional, para implementar estrategias de control de la criminalidad y de esta forma disminuir o erradicar la misma en la ciudad de Medellín.
+
+
+
+
+
+
